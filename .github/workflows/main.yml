@@ -1,0 +1,14 @@
+name: Otomatik Ziyaret
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+
+jobs:
+  ziyaret:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: URL'yi ziyaret et
+      run: |
+        curl -sS https://igapi.codermert1.repl.co
